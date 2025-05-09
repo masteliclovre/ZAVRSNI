@@ -4,6 +4,9 @@ pokretanje:
    run:
       ./a data/lambda/lambda.fasta data/lambda/aln.sam results/myoutput2.vcf
 
+   run both:
+      ./a data/lambda/lambda.fasta data/lambda/aln_sorted.sam results/mympileup.mpileup | ./b results/mympileup.mpileup results/mynewoutput.vcs 0.8
+
 stranica koju koristio za literaturu:
 https://pysam.readthedocs.io/en/latest/api.html
 https://www.metagenomics.wiki/tools/samtools/bam-sam-file-format
