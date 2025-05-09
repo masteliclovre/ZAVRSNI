@@ -1,0 +1,9 @@
+pokretanje:
+   compile:
+      g++ -o a src/main.cpp
+   run:
+      ./a data/lambda/lambda.fasta data/lambda/aln.sam results/myoutput2.vcf
+
+stranica koju koristio za literaturu:
+https://pysam.readthedocs.io/en/latest/api.html
+https://www.metagenomics.wiki/tools/samtools/bam-sam-file-format
