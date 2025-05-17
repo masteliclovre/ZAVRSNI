@@ -11,6 +11,7 @@
 double phred_to_prob(int phred);
 double prob_to_phred(double prob);
 
+//struktura za spremanje podataka o varijanti
 struct Variant {
     std::string chrom;
     int pos;
@@ -26,16 +27,21 @@ struct Variant {
     double quality;
 };
 
+//pretvara phred rezultat u vjerojatnost
 double phred_to_prob(int phred) {
     return std::pow(10.0, -phred / 10.0);
 }
 
+
+ //pretvara vjerojatnost u phred rezultat
 double prob_to_phred(double prob) {
     return (prob > 0) ? -10.0 * std::log10(prob) : 99.0;
 }
 
 void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
+    //mapa za spremanje određene varijante i broj njenih ponavljanja
     std::unordered_map<std::string, int> variant_counts;
+    //mapa za spremanje određene varijante i njihovih kvaliteta
     std::unordered_map<std::string, double> variant_qualities;
 
     bool isDel = false;
@@ -45,11 +51,13 @@ void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
     size_t index = 0;
     size_t total_bases = 0;
 
+    //obradujemo bazu po bazu varijanti na odredenoj referentoj poziciji
     while(i < var.bases.size()){
-        char base = var.bases[i];
-        char qual = (index < var.qualities.size()) ? var.qualities[index] : '!';
-        int phred = (qual != '!') ? qual - 33 : 30;
+        char base = var.bases[i]; //spremamo bazu
+        char qual = (index < var.qualities.size()) ? var.qualities[index] : '!'; //ako postoji kvaliteta i nju spremamo
+        int phred = (qual != '!') ? qual - 33 : 30; //ako nema kvalitete, postavljamo defaultnu vrijednost
 
+        //ignoriramo znakove ^, $, *, <, >, jer ne sadrže informacije relevantne za našu analizu
         if(base == '^') {
             i += 2;
             continue;
@@ -64,23 +72,26 @@ void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
             continue;
         }
 
+        //ako je trenutna baza + ili - znači da je to indel i moramo ga obraditi
         if(base == '+' || base == '-') {
             isDel = (base == '-');
             i++;
 
-            // Parse indel size
+            //zapisujemo duljinu indela tako što provjeravamo je li idući znak broj, ako nije došli smo do zadnje znamenke duljine
             indel_size = 0;
             while(i < var.bases.size() && isdigit(var.bases[i])) {
                 indel_size = indel_size * 10 + (var.bases[i] - '0');
+                //inkrementiramo poziciju u bazama nakon svake pročitane znamenke
                 i++;
             }
 
-            // Parse indel sequence
+            //ispraznimo prijašnji niz zapisan u stringu te sad zapisujemo novu sekvencu, duljine koju smo pronašli korak prije
             indel_sequence.clear();
             for(size_t j = 0; j < indel_size && i < var.bases.size(); j++, i++) {
                 indel_sequence.push_back(std::toupper(var.bases[i]));
             }
 
+            //zapisujemo varijantu u mapu i inkrementiramo ukupni broj baza i index za kvalitete
             std::string key = (isDel ? "-" : "+") + indel_sequence;
             variant_counts[key]++;
             variant_qualities[key] += phred;
@@ -89,12 +100,14 @@ void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
             continue;
         }
 
+        //baza je jednaka referentoj bazi 
         if(base == '.' || base == ',') {
             variant_counts[var.ref]++;
             variant_qualities[var.ref] += phred;
             total_bases++;
             index++;
         }
+        //baza je SNP 
         else if(isalpha(base)) {
             std::string alt(1, std::toupper(base));
             variant_counts[alt]++;
@@ -105,22 +118,23 @@ void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
         i++;
     }
 
-    // Create alleles vector
+    //izracunavamo frekvenciju pojavljivanja varijacije kao omjer pojavljivanja s ukupnim brojem variranih baza
     std::vector<std::pair<std::string, double>> alleles;
     for(const auto& entry : variant_counts) {
         const std::string& base = entry.first;
         int count = entry.second;
         double freq = static_cast<double>(count) / total_bases;
+        //kvaliteta varijacije je zbroj kvaliteta svih ponavljanja varijacije podjeljen s ukupnim brojem ponavljanja
         double avg_qual = variant_qualities[base] / count;
         alleles.emplace_back(base, freq * avg_qual);
     }
 
-    // Sort alleles by score descending
-    std::sort(alleles.begin(), alleles.end(),
-        [](const std::pair<std::string, double>& a, const std::pair<std::string, double>& b) {
+    //sortiramo novonastalu mapu varijacija po rezultatu freq*avg_qual od veceg prema manjem
+    std::sort(alleles.begin(), alleles.end(), [](const std::pair<std::string, double>& a, const std::pair<std::string, double>& b) {
             return a.second > b.second;
         });
 
+    //postavljamo defaultne vrijednosti
     var.alt = var.ref;
     var.freq = 0.0;
     var.AC = 0;
@@ -128,9 +142,11 @@ void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
     var.AD = {0, 0};
     var.quality = 0.0;
 
+    //uzimamo najbolju varijaciju ako postoji i razlicita je od referente, onda spremamo njene vrijednosti
     if(!alleles.empty() && alleles[0].first != var.ref){
         var.alt = alleles[0].first;
         var.freq = static_cast<double>(variant_counts[var.alt]) / total_bases;
+        //broj pojavljivanja referentnog nukleotida i alternativnog
         var.AD = {variant_counts[var.ref], variant_counts[var.alt]};
 
         if(var.freq >= 0.9){
@@ -151,16 +167,18 @@ void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
         }
     }
 
+    //ako smo uspijeli nać varijaciju koja nam je korisna zapisujemo ju na standardni oblik u vcf datoteku
     if(var.alt != var.ref){
         vcf_output_file << var.chrom << "\t" << var.pos << "\t" << '.' << "\t" << var.ref << "\t" << var.alt << "\t" 
                         << var.quality << "\t" << "PASS" << "\t" 
                         << "DP=" << var.coverage << ";AC=" << var.AC << ";AN=" << var.AN << ";AF=" << var.freq << "\t" 
                         << "GT:DP:AD:PL" << "\t";
         
-        double p_ref = phred_to_prob(var.quality);
-        double p_het = 0.5;
-        double p_hom = 1.0 - p_het;
+        double p_ref = phred_to_prob(var.quality); //vjerojatnost da je ref ispravan
+        double p_het = 0.5; //pretpostavljamo vjerojatnost da je varijacija heterozigotna
+        double p_hom = 1.0 - p_het; //pretpostavljamo vjerojatnost da je varijacija homozigotna
 
+        //phred-scaled vjerojatnosti genotipova
         int pl_ref = static_cast<int>(prob_to_phred(1.0 - p_ref));
         int pl_het = static_cast<int>(prob_to_phred(1.0 - p_het));
         int pl_hom = static_cast<int>(prob_to_phred(1.0 - p_hom));
@@ -172,6 +190,7 @@ void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
 }
 
 int main(int argc, char* argv[]) {
+    //provjera broja argumenata i ispis poruke u slučaju neispravnosti
     if (argc != 4) {
         std::cerr << "Usage: " << argv[0] << " <pileup_file> <vcf_output_file> <threshold>\n";
         return 1;
@@ -181,19 +200,19 @@ int main(int argc, char* argv[]) {
     std::string vcf_output_file = argv[2];
     double threshold = std::stod(argv[3]);
 
+    //ako se datoteke ne mogu otvoriti/stvoriti ispisuj poruku o grešci i prekini program
     std::ifstream in(pileup_file);
     if (!in) {
         std::cerr << "Could not open " << pileup_file << "\n";
         return 1;
     }
-
     std::ofstream vcf_output(vcf_output_file);
     if (!vcf_output) {
         std::cerr << "Could not create " << vcf_output_file << "\n";
         return 1;
     }
 
-    // VCF header
+    // VCF headeri
     vcf_output << "##fileformat=VCFv4.2\n";
     vcf_output << "##FILTER=<ID=PASS,Description=\"All filters passed\">\n";
     vcf_output << "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n";
@@ -207,6 +226,7 @@ int main(int argc, char* argv[]) {
     vcf_output << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE\n";
 
     std::string line;
+    //liniju po liniju pileup datoteke parsiramo
     while (std::getline(in, line)) {
         std::stringstream ss(line);
         std::string chrom;
@@ -217,8 +237,11 @@ int main(int argc, char* argv[]) {
         std::string qualities;
 
         ss >> chrom >> pos >> ref >> coverage >> bases >> qualities;
+        pos -= 1;
+        //ako je na poziciji referentnog nukleotida postoji varijacija zapisujemo ju u variantu i parsiramo
         if (coverage > 0) {
             Variant var = {chrom, pos, ref, ref, coverage, bases, qualities, 0.0, 0, 0};
+            //pazimo da su sva slova velika za lakše procesiranje
             std::transform(var.ref.begin(), var.ref.end(), var.ref.begin(), [](unsigned char c) { return std::toupper(c); });
             parse_var(var, vcf_output, threshold);
         }
