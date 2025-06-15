@@ -1,12 +1,67 @@
 pokretanje:
-   compile:
-      g++ -o a src/main.cpp
-   run:
-      ./a data/lambda/lambda.fasta data/lambda/aln.sam results/myoutput2.vcf
+   
 
    run both:
-      ./a data/lambda/lambda.fasta data/lambda/aln_sorted.sam results/mympileup.mpileup | ./b results/mympileup.mpileup results/mynewoutput.vcs 0.8
+   kratki fasta file:
+      ./a data/lambda/lambda.fasta data/lambda/aln_sorted.sam results/mympileup.mpileup
+      ./b results/mympileup.mpileup results/mynewoutput.vcf 0.9
+
+1.verzija (krivo)
+   indeksiranje referentong genoma:
+      bwa index reference.fasta
+   poravnanje očitanja:
+      bwa mem reference.fasta reads.fasta > unsorted.sam
+   sortiranje uz pomoć samtools:
+      samtools sort -O SAM -o sorted.sam unsorted.sam
+2.verzija
+   mapiranje:
+      minimap2 -ax map-ont data/lambda/lambda.fasta data/lambda/lambda_simulated_reads.fasta > aln.sam
+      minimap2 -ax map-ont data/ecoli/ecoli.fasta data/ecoli/ecoli_simulated_reads.fasta > data/ecoli/aln.sam
+   sortiranje:
+      samtools sort -O SAM -o sorted.sam unsorted.sam
+      samtools sort -O SAM -o data/ecoli/sorted.sam data/ecoli/aln.sam
+   generiranje pileupa:
+      samtools mpileup -f data/lambda/lambda.fasta data/lambda/aln_sorted.sam > data/lambda/output.mpileup
+      samtools mpileup -f data/ecoli/ecoli.fasta data/ecoli/aln_sorted.sam > data/ecoli/output.mpileup
+
+   bcftools verzija:
+      sam to bam:
+         samtools view -bS data/lambda/aln_unsorted.sam  > data/lambda/aln.bam
+         samtools view -bS data/ecoli/aln.sam  > data/ecoli/aln.bam
+      sort bam:
+         samtools sort data/lambda/aln.bam -o data/lambda/aln_sorted.bam
+         samtools sort data/ecoli/aln.bam -o data/ecoli/aln_sorted.bam
+      index bam:
+         samtools index data/lambda/aln_sorted.bam
+         samtools index data/ecoli/aln_sorted.bam
+      generiranje VCF:
+         bcftools mpileup -Ou -f data/lambda/lambda.fasta data/lambda/aln_sorted.bam | bcftools call -mv -Ob -o results/lambda/bcftools_output/variants.vcf
+         bcftools mpileup -Ou -f data/ecoli/ecoli.fasta data/ecoli/aln_sorted.bam | bcftools call -mv -Ob -o results/ecoli/bcftools_output/variants.vcf
+      filtriranje po kvaliteti:
+         bcftools filter -i 'QUAL>=90' results/lambda/bcftools_output/variants.vcf -Ov -o results/lambda/bcftools_output/filtered.vcf
+
+   moja verzija:
+      compile:
+         g++ -o variant_caller src/main.cpp -std=c++17 -O3
+      run:
+         lambda: ./variant_caller data/lambda/lambda.fasta data/lambda/aln_sorted.sam results/lambda/my_output/myoutput_v4.vcf 0.9
+         ecoli: ./variant_caller data/ecoli/ecoli.fasta data/ecoli/aln_sorted.sam results/ecoli/my_output/myoutput_v2.vcf 0.9
 
 stranica koju koristio za literaturu:
 https://pysam.readthedocs.io/en/latest/api.html
 https://www.metagenomics.wiki/tools/samtools/bam-sam-file-format
+https://www.youtube.com/watch?v=xHPm0DKAS7c
+https://github.com/lh3/minimap2
+https://www.ebi.ac.uk/training/online/courses/human-genetic-variation-introduction/variant-identification-and-analysis/ -----------------uzeo sliku
+https://embl-ebi.cloud.panopto.eu/Panopto/Pages/Viewer.aspx?id=a74beaaf-de39-4d3b-8892-ae3900aa42f2
+https://www.youtube.com/watch?v=woKXw1R8LMA&t=398s
+https://www.ebi.ac.uk/training/online/courses/human-genetic-variation-introduction/variant-identification-and-analysis/
+https://en.wikipedia.org/wiki/Variant_Call_Format ----------------------------stavi kredit za slike tablica
+https://en.wikipedia.org/wiki/Single-nucleotide_polymorphism
+https://en.wikipedia.org/wiki/SAM_(file_format) -----------------------uzeo slike
+https://www.htslib.org/doc/samtools-mpileup.html
+https://en.wikipedia.org/wiki/Pileup_format --------------------------uzeo slike
+https://en.wikipedia.org/wiki/FASTA_format
+
+za crtanje dijagrama:
+https://app.diagrams.net/#

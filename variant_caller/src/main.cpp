@@ -7,6 +7,10 @@
 #include <cctype>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
+
+std::string name = "UNKNOWN";
+std::string length_str = "0";
 
 double phred_to_prob(int phred);
 double prob_to_phred(double prob);
@@ -21,8 +25,8 @@ struct Variant {
     std::string bases;
     std::string qualities;
     double freq;
-    int AC;
-    int AN;
+    int AC;//broj varijanti
+    int AN;//ukupan broj varijanti
     std::vector<int> AD;
     double quality;
 };
@@ -40,7 +44,6 @@ struct PileupEntry {
 double phred_to_prob(int phred) {
     return std::pow(10.0, -phred / 10.0);
 }
-
 
  //pretvara vjerojatnost u phred rezultat
 double prob_to_phred(double prob) {
@@ -250,7 +253,7 @@ public:
         return seq[pos - 1];
     }
     
-    //funkcija učitava linijju po liniju poravnatih podataka parsira ju i salje na obradu očitanja
+    //funkcija učitava liniju po liniju poravnatih podataka parsira ju i salje na obradu očitanja
     void process_sam(const std::string& sam_file, const std::string& output_file) {
         //provjera ako je moguće otvoriti navedeni sam file
         std::ifstream in(sam_file);
@@ -262,6 +265,10 @@ public:
         std::string line;
         while (std::getline(in, line)) {
             //preskačemo linije koje pocinju '@', jer su to komentari
+            if(line.substr(0, 3) == "@SQ"){
+                name = line.substr(7, line.find("LN:") - 8);
+                length_str = line.substr(line.find("LN:") + 3);
+            }
             if (line[0] == '@') continue;
             
             std::istringstream ss(line);
@@ -479,6 +486,8 @@ private:
 
 int main(int argc, char* argv[]) {
 
+    auto start = std::chrono::high_resolution_clock::now();
+
      //provjera broja argumenata i ispis poruke u slučaju neispravnosti
      if (argc != 5) {
         std::cerr << "Usage: " << argv[0] << " <reference_genome> <sam_file> <vcf_output_file> <threshold>\n";
@@ -519,6 +528,7 @@ int main(int argc, char* argv[]) {
     // VCF header
     vcf_output << "##fileformat=VCFv4.2\n";
     vcf_output << "##FILTER=<ID=PASS,Description=\"All filters passed\">\n";
+    vcf_output << "##contig=<ID="<< name << ",length="<< length_str <<">\n";
     vcf_output << "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">\n";
     vcf_output << "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">\n";
     vcf_output << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
@@ -547,5 +557,10 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "VCF file generated: " << vcf_output_file << "\n";
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "Time taken: " << elapsed.count() << " s\n";
+
     return 0;
 }
