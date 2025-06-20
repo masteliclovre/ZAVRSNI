@@ -187,8 +187,8 @@ void parse_var(Variant& var, std::ofstream& vcf_output_file, double threshold) {
 
     //ako smo uspijeli nać varijaciju koja nam je korisna zapisujemo ju na standardni oblik u vcf datoteku
     if(var.alt != var.ref){
-        vcf_output_file << var.chrom << "\t" << var.pos << "\t.\t" << var.ref << "\t" << var.alt 
-           << "\t.\tPASS\tDP=" << var.coverage << ";AF=" << var.freq << "\n";
+        vcf_output_file << var.chrom << "\t" << var.pos +1 << "\t.\t" << var.ref << "\t" << var.alt 
+           << "\t.\t" << var.quality << "\tDP=" << var.coverage << ";AF=" << var.freq << "\n";
     }
 }
 

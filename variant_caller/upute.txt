@@ -24,7 +24,7 @@ pokretanje:
       samtools mpileup -f data/lambda/lambda.fasta data/lambda/aln_sorted.sam > data/lambda/output.mpileup
       samtools mpileup -f data/ecoli/ecoli.fasta data/ecoli/aln_sorted.sam > data/ecoli/output.mpileup
 
-   bcftools verzija:
+   2.1 bcftools verzija:
       sam to bam:
          samtools view -bS data/lambda/aln_unsorted.sam  > data/lambda/aln.bam
          samtools view -bS data/ecoli/aln.sam  > data/ecoli/aln.bam
@@ -40,12 +40,13 @@ pokretanje:
       filtriranje po kvaliteti:
          bcftools filter -i 'QUAL>=90' results/lambda/bcftools_output/variants.vcf -Ov -o results/lambda/bcftools_output/filtered.vcf
 
-   moja verzija:
+   2.2 moja verzija:
       compile:
          g++ -o variant_caller src/main.cpp -std=c++17 -O3
       run:
          lambda: ./variant_caller data/lambda/lambda.fasta data/lambda/aln_sorted.sam results/lambda/my_output/myoutput_v4.vcf 0.9
          ecoli: ./variant_caller data/ecoli/ecoli.fasta data/ecoli/aln_sorted.sam results/ecoli/my_output/myoutput_v2.vcf 0.9
+         cattle1: ./variant_caller data/cattle1/genome.fa data/cattle1/sorted.sam results/cattle1/my_output/myoutput_v1.vcf 0.9
 
 stranica koju koristio za literaturu:
 https://pysam.readthedocs.io/en/latest/api.html
@@ -62,6 +63,8 @@ https://en.wikipedia.org/wiki/SAM_(file_format) -----------------------uzeo slik
 https://www.htslib.org/doc/samtools-mpileup.html
 https://en.wikipedia.org/wiki/Pileup_format --------------------------uzeo slike
 https://en.wikipedia.org/wiki/FASTA_format
+https://www.youtube.com/watch?v=EpD2ZHM7Q8Q
+https://www.youtube.com/watch?v=ZKwm8dqIQpg
 
 za crtanje dijagrama:
 https://app.diagrams.net/#
